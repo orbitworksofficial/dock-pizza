@@ -1,0 +1,261 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../**/*.blade.php';
+@source '../**/*.js';
+
+/* ═══════════════════════════════════════════════════════
+   CHEEZIOUS-INSPIRED PRESETS & UTILITIES
+   ═══════════════════════════════════════════════════════ */
+
+:root {
+    --brand-navy: #1B3A5C;
+    --brand-navy-hover: #142D47;
+    --brand-orange: #E07B2D;
+    --brand-orange-hover: #C96A22;
+    --brand-cream: #F5F0E8;
+    --brand-yellow: #E07B2D;
+    --brand-yellow-hover: #C96A22;
+    --bg-light: #F5F0E8;
+    --text-dark: #1B3A5C;
+    --text-muted: #6E6E73;
+}
+
+body {
+    background-color: var(--bg-light);
+    color: var(--text-dark);
+    font-family: 'Outfit', sans-serif;
+}
+
+.font-serif-brand {
+    font-family: 'Playfair Display', serif;
+}
+
+/* Glassmorphism Header & Card Styling */
+.header-shadow {
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.03);
+}
+
+.search-input-focus:focus {
+    border-color: var(--brand-orange);
+    box-shadow: 0 0 0 3px rgba(224, 123, 45, 0.15);
+}
+
+/* Custom yellow and orange button utilities */
+.btn-yellow {
+    background-color: var(--brand-yellow);
+    color: var(--text-dark);
+    font-weight: 700;
+    transition: all 0.2s ease-in-out;
+}
+
+.btn-yellow:hover {
+    background-color: var(--brand-yellow-hover);
+    transform: translateY(-1px);
+}
+
+.btn-orange {
+    background-color: var(--brand-orange);
+    color: white;
+    font-weight: 700;
+    transition: all 0.2s ease-in-out;
+}
+
+.btn-orange:hover {
+    background-color: var(--brand-orange-hover);
+    transform: translateY(-1px);
+}
+
+/* Dock Pizza Nautical Theme */
+.dock-wave-border {
+    background: repeating-linear-gradient(90deg,
+            var(--brand-navy) 0px,
+            var(--brand-navy) 20px,
+            transparent 20px,
+            transparent 30px);
+    height: 4px;
+}
+
+.dock-menu-card {
+    background: linear-gradient(135deg, #F5F0E8 0%, #EDE6DA 100%);
+    border: 2px solid rgba(27, 58, 92, 0.12);
+}
+
+.dock-brand-logo-wrap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.875rem;
+    line-height: 0;
+}
+
+.dock-brand-logo {
+    display: block;
+    width: auto;
+    max-width: none;
+    object-fit: contain;
+    object-position: center;
+    border: 0;
+    box-shadow: none;
+    filter: none;
+    -webkit-filter: none;
+}
+
+.dock-brand-logo--header {
+    height: 3.75rem;
+}
+
+@media (min-width: 640px) {
+    .dock-brand-logo--header {
+        height: 4.75rem;
+    }
+}
+
+@media (min-width: 1024px) {
+    .dock-brand-logo--header {
+        height: 5.25rem;
+    }
+}
+
+.dock-rope-border {
+    border-image: repeating-linear-gradient(45deg,
+            #8B6914,
+            #8B6914 4px,
+            #A67C00 4px,
+            #A67C00 8px) 4;
+}
+
+.menu-dot-leader {
+    flex-grow: 1;
+    border-bottom: 1px dotted rgba(27, 58, 92, 0.25);
+    margin: 0 8px 4px;
+    min-width: 20px;
+}
+
+/* ─── Page load & card animations ─────────────────────────── */
+@keyframes page-enter {
+    from {
+        opacity: 0;
+        transform: translateY(18px);
+    }
+
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+@keyframes card-pop {
+    from {
+        opacity: 0;
+        transform: translateY(28px) scale(0.96);
+    }
+
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+.page-enter {
+    animation: page-enter 0.75s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.page-enter-delay {
+    animation: page-enter 0.85s cubic-bezier(0.22, 1, 0.36, 1) 0.12s both;
+}
+
+.menu-cat-card {
+    transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.35s ease, border-color 0.3s ease;
+}
+
+.menu-cat-card:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 18px 40px rgba(27, 58, 92, 0.14);
+}
+
+.menu-cat-card img {
+    transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Google Places dropdown above modals */
+.pac-container {
+    z-index: 10050 !important;
+    border-radius: 12px;
+    border: 1px solid #e7e5e4;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12);
+    margin-top: 4px;
+    font-family: 'Outfit', sans-serif;
+}
+
+.pac-item {
+    padding: 10px 12px;
+    cursor: pointer;
+}
+
+.pac-item:hover {
+    background: #F5F0E8;
+}
+
+/* Free street autocomplete dropdown */
+.dock-address-suggestions {
+    display: none;
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(100% + 6px);
+    z-index: 60;
+    margin: 0;
+    padding: 6px 0;
+    list-style: none;
+    background: #fff;
+    border: 1px solid #e7e5e4;
+    border-radius: 16px;
+    box-shadow: 0 16px 36px rgba(27, 58, 92, 0.14);
+    max-height: 260px;
+    overflow-y: auto;
+}
+
+.dock-address-suggestions.is-open {
+    display: block;
+}
+
+.dock-address-suggestions li {
+    padding: 10px 14px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.dock-address-suggestions li:hover,
+.dock-address-suggestions li:focus {
+    background: #F5F0E8;
+    outline: none;
+}
+
+.dock-address-suggestions__street {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: #1B3A5C;
+}
+
+.dock-address-suggestions__meta {
+    display: block;
+    margin-top: 2px;
+    font-size: 0.75rem;
+    color: #78716c;
+}
+
+.location-ajax-error {
+    display: none;
+}
+
+.location-ajax-error.is-visible {
+    display: block;
+}
+
+body.is-page-transitioning main {
+    opacity: 0;
+    transition: opacity 0.25s ease;
+}
