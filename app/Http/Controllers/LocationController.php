@@ -6,12 +6,17 @@ namespace App\Http\Controllers;
 
 use App\Models\DeliveryZone;
 use App\Models\Store;
+use App\Services\GeocodingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 class LocationController extends Controller
 {
+    public function __construct(private readonly GeocodingService $geocoder)
+    {
+    }
+
     /**
      * Set selected store and order type (delivery/pickup) in session.
      */
@@ -67,24 +72,58 @@ class LocationController extends Controller
                 ]);
             }
 
-            $zone = DeliveryZone::where('zip_code', $zip)
-                ->where('is_active', true)
-                ->first();
+            $address = trim((string) $request->input('address', ''));
+            $distance = null;
+            $coordinates = null;
+            $store = null;
 
-            if (!$zone) {
-                if ($request->wantsJson()) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Sorry, we do not deliver to ZIP code ' . $zip . ' yet. Try ordering for pickup!'
-                    ], 422);
+            // Primary check: is the address inside a store's delivery radius?
+            // Geocoding runs server-side so client-supplied coordinates cannot
+            // be spoofed to force an out-of-range order through.
+            if ($address !== '') {
+                $coordinates = $this->geocoder->geocode($address, $zip);
+
+                if ($coordinates) {
+                    $match = Store::findDeliveringTo($coordinates['latitude'], $coordinates['longitude']);
+
+                    if ($match) {
+                        $store = $match['store'];
+                        $distance = round($match['distance'], 2);
+                    } else {
+                        // Geocoding worked and the address is genuinely out of
+                        // range — trust that over the coarser ZIP lookup.
+                        $nearest = $this->nearestDeliveryStore($coordinates);
+                        $message = $nearest
+                            ? sprintf(
+                                'Sorry, that address is about %s miles from our %s location, which delivers up to %s miles. Try ordering for pickup!',
+                                number_format($nearest['distance'], 1),
+                                $nearest['store']->name,
+                                rtrim(rtrim(number_format((float) $nearest['store']->delivery_radius, 1), '0'), '.')
+                            )
+                            : 'Sorry, that address is outside our delivery area. Try ordering for pickup!';
+
+                        return $this->deliveryUnavailable($request, $message);
+                    }
                 }
-
-                return back()->withInput()->withErrors([
-                    'zip_code' => 'Sorry, we do not deliver to ZIP code ' . $zip . ' yet. Try ordering for pickup!'
-                ]);
             }
 
-            $store = $zone->store;
+            // Fallback: geocoding unavailable (no API key, outage, or no
+            // address entered) — fall back to the ZIP zone table so an outage
+            // never blocks ordering entirely.
+            if (!$store) {
+                $zone = DeliveryZone::where('zip_code', $zip)
+                    ->where('is_active', true)
+                    ->first();
+
+                if (!$zone || !$zone->store) {
+                    return $this->deliveryUnavailable(
+                        $request,
+                        'Sorry, we do not deliver to ZIP code ' . $zip . ' yet. Try ordering for pickup!'
+                    );
+                }
+
+                $store = $zone->store;
+            }
 
             session([
                 'order_location' => [
@@ -93,7 +132,10 @@ class LocationController extends Controller
                     'store_name' => $store->name,
                     'store_slug' => $store->slug,
                     'zip_code' => $zip,
-                    'address' => $request->input('address', ''),
+                    'address' => $address,
+                    'latitude' => $coordinates['latitude'] ?? null,
+                    'longitude' => $coordinates['longitude'] ?? null,
+                    'distance_miles' => $distance,
                 ]
             ]);
 
@@ -105,8 +147,55 @@ class LocationController extends Controller
                 ]);
             }
 
-            return redirect()->route('menu.index')->with('success', 'Delivery set to ' . $zip . ' from ' . $store->name);
+            $confirmation = $distance !== null
+                ? sprintf('Delivery set — %s is %s miles away.', $store->name, number_format($distance, 1))
+                : 'Delivery set to ' . $zip . ' from ' . $store->name;
+
+            return redirect()->route('menu.index')->with('success', $confirmation);
         }
+    }
+
+    /**
+     * Nearest delivery-capable store to a point, ignoring its radius.
+     * Used only to explain how far out of range an address is.
+     *
+     * @param  array{latitude: float, longitude: float}  $coordinates
+     * @return array{store: Store, distance: float}|null
+     */
+    private function nearestDeliveryStore(array $coordinates): ?array
+    {
+        $nearest = null;
+
+        $stores = Store::where('is_active', true)
+            ->where('accepts_delivery', true)
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude')
+            ->get();
+
+        foreach ($stores as $store) {
+            $distance = $store->distanceTo($coordinates['latitude'], $coordinates['longitude']);
+
+            if ($distance !== null && ($nearest === null || $distance < $nearest['distance'])) {
+                $nearest = ['store' => $store, 'distance' => $distance];
+            }
+        }
+
+        return $nearest;
+    }
+
+    /**
+     * Consistent rejection response for an out-of-range delivery address.
+     */
+    private function deliveryUnavailable(Request $request, string $message): RedirectResponse|JsonResponse
+    {
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => false,
+                'message' => $message,
+            ], 422);
+        }
+
+        return back()->withInput()->withErrors(['zip_code' => $message]);
     }
 
     /**

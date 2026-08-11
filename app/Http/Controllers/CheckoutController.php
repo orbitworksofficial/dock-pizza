@@ -18,6 +18,7 @@ use App\Models\Product;
 use App\Models\ProductVariation;
 use App\Models\Store;
 use App\Models\Topping;
+use App\Services\GeocodingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -60,6 +61,14 @@ class CheckoutController extends Controller
         ));
     }
 
+    /**
+     * Coordinates resolved during the delivery-radius check, reused when the
+     * order row is written so the address is geocoded only once per checkout.
+     *
+     * @var array{latitude: float, longitude: float, formatted: string, provider: string}|null
+     */
+    private ?array $deliveryCoordinates = null;
+
     public function placeOrder(Request $request): JsonResponse
     {
         $request->validate([
@@ -96,7 +105,9 @@ class CheckoutController extends Controller
                 if (!$store) {
                     return response()->json([
                         'success' => false,
-                        'message' => 'Could not determine the store for your order. Please select a store or enter a valid delivery address.',
+                        'message' => $request->input('order_type') === 'delivery'
+                            ? 'Sorry, that delivery address is outside our delivery area. Please try a different address or switch to pickup.'
+                            : 'Could not determine the store for your order. Please select a store or enter a valid delivery address.',
                     ], 422);
                 }
 
@@ -224,6 +235,8 @@ class CheckoutController extends Controller
                     'delivery_city' => $request->input('city'),
                     'delivery_state' => $request->input('state'),
                     'delivery_zip' => $request->input('zip_code'),
+                    'delivery_latitude' => $this->deliveryCoordinates['latitude'] ?? null,
+                    'delivery_longitude' => $this->deliveryCoordinates['longitude'] ?? null,
                     'delivery_instructions' => $request->input('delivery_instructions'),
                     'estimated_minutes' => $orderType === 'delivery'
                         ? $store->estimated_delivery_time
@@ -382,7 +395,29 @@ class CheckoutController extends Controller
             return Store::where('is_active', true)->find($request->input('store_id'));
         }
 
-        // For delivery, check session first
+        // For delivery, re-verify the address is in range. The address can be
+        // edited at checkout, so trusting the session alone would let someone
+        // pass the radius check with one address and order to another.
+        $address = trim((string) $request->input('address', ''));
+
+        if ($orderType === 'delivery' && $address !== '') {
+            $coordinates = app(GeocodingService::class)->geocode(
+                $address,
+                $request->input('zip_code'),
+                $request->input('city'),
+                $request->input('state')
+            );
+
+            if ($coordinates) {
+                // Cached so the order record can reuse it without geocoding twice.
+                $this->deliveryCoordinates = $coordinates;
+
+                $match = Store::findDeliveringTo($coordinates['latitude'], $coordinates['longitude']);
+
+                return $match ? $match['store'] : null;
+            }
+        }
+
         $orderLocation = session('order_location');
         if ($orderLocation && isset($orderLocation['store_id'])) {
             return Store::where('is_active', true)->find($orderLocation['store_id']);
