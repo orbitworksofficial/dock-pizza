@@ -10,6 +10,7 @@ use App\Services\GeocodingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class LocationController extends Controller
 {
@@ -83,6 +84,15 @@ class LocationController extends Controller
             if ($address !== '') {
                 $coordinates = $this->geocoder->geocode($address, $zip);
 
+                if (!$coordinates) {
+                    // Falling through to the ZIP table here hides *why* a
+                    // customer was refused, so make it visible in the log.
+                    Log::warning('Delivery radius check skipped: geocoding returned no result', [
+                        'address' => $address,
+                        'zip' => $zip,
+                    ]);
+                }
+
                 if ($coordinates) {
                     $match = Store::findDeliveringTo($coordinates['latitude'], $coordinates['longitude']);
 
@@ -105,6 +115,10 @@ class LocationController extends Controller
                         return $this->deliveryUnavailable($request, $message);
                     }
                 }
+            }
+
+            if ($address === '') {
+                Log::warning('Delivery radius check skipped: no street address submitted', ['zip' => $zip]);
             }
 
             // Fallback: geocoding unavailable (no API key, outage, or no
