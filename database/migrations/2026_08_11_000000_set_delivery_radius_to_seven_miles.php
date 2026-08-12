@@ -20,6 +20,7 @@ return new class extends Migration
 
         DB::table('stores')->update(['delivery_radius' => 7.00]);
 //
+//
         // The seeded coordinates for both locations pointed at Baltimore
         // (~34 miles off for Shady Side). Harmless while delivery was gated by
         // ZIP, but fatal now that distance decides eligibility.
