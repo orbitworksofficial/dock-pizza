@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Models\DeliveryZone;
 use App\Models\Store;
 use App\Services\GeocodingService;
 use Illuminate\Http\JsonResponse;
@@ -55,7 +54,8 @@ class LocationController extends Controller
 
             return redirect()->route('menu.index')->with('success', 'Ordering pickup from ' . $store->name);
         } else {
-            // Delivery flow: Find store serving this zip code
+            // Delivery flow: the ZIP only sharpens the geocoding lookup —
+            // eligibility is decided purely by distance from a store.
             $zipRaw = trim((string) $request->input('zip_code'));
             $zipDigits = preg_replace('/\D+/', '', $zipRaw) ?? '';
             $zip = substr($zipDigits, 0, 5);
@@ -74,70 +74,46 @@ class LocationController extends Controller
             }
 
             $address = trim((string) $request->input('address', ''));
-            $distance = null;
-            $coordinates = null;
-            $store = null;
-
-            // Primary check: is the address inside a store's delivery radius?
-            // Geocoding runs server-side so client-supplied coordinates cannot
-            // be spoofed to force an out-of-range order through.
-            if ($address !== '') {
-                $coordinates = $this->geocoder->geocode($address, $zip);
-
-                if (!$coordinates) {
-                    // Falling through to the ZIP table here hides *why* a
-                    // customer was refused, so make it visible in the log.
-                    Log::warning('Delivery radius check skipped: geocoding returned no result', [
-                        'address' => $address,
-                        'zip' => $zip,
-                    ]);
-                }
-
-                if ($coordinates) {
-                    $match = Store::findDeliveringTo($coordinates['latitude'], $coordinates['longitude']);
-
-                    if ($match) {
-                        $store = $match['store'];
-                        $distance = round($match['distance'], 2);
-                    } else {
-                        // Geocoding worked and the address is genuinely out of
-                        // range — trust that over the coarser ZIP lookup.
-                        $nearest = $this->nearestDeliveryStore($coordinates);
-                        $message = $nearest
-                            ? sprintf(
-                                'Sorry, that address is about %s miles from our %s location, which delivers up to %s miles. Try ordering for pickup!',
-                                number_format($nearest['distance'], 1),
-                                $nearest['store']->name,
-                                rtrim(rtrim(number_format((float) $nearest['store']->delivery_radius, 1), '0'), '.')
-                            )
-                            : 'Sorry, that address is outside our delivery area. Try ordering for pickup!';
-
-                        return $this->deliveryUnavailable($request, $message);
-                    }
-                }
-            }
 
             if ($address === '') {
-                Log::warning('Delivery radius check skipped: no street address submitted', ['zip' => $zip]);
+                return $this->deliveryUnavailable($request, 'Please enter your street address so we can check if you are in range.');
             }
 
-            // Fallback: geocoding unavailable (no API key, outage, or no
-            // address entered) — fall back to the ZIP zone table so an outage
-            // never blocks ordering entirely.
-            if (!$store) {
-                $zone = DeliveryZone::where('zip_code', $zip)
-                    ->where('is_active', true)
-                    ->first();
+            // Distance is the only thing that decides delivery. Geocoding runs
+            // server-side so client-supplied coordinates cannot be spoofed to
+            // force an out-of-range order through.
+            $coordinates = $this->geocoder->geocode($address, $zip);
 
-                if (!$zone || !$zone->store) {
-                    return $this->deliveryUnavailable(
-                        $request,
-                        'Sorry, we do not deliver to ZIP code ' . $zip . ' yet. Try ordering for pickup!'
-                    );
-                }
+            if (!$coordinates) {
+                Log::warning('Delivery address could not be geocoded', [
+                    'address' => $address,
+                    'zip' => $zip,
+                ]);
 
-                $store = $zone->store;
+                return $this->deliveryUnavailable(
+                    $request,
+                    'We could not locate that address. Please check the street and ZIP, or order for pickup.'
+                );
             }
+
+            $match = Store::findDeliveringTo($coordinates['latitude'], $coordinates['longitude']);
+
+            if (!$match) {
+                $nearest = $this->nearestDeliveryStore($coordinates);
+                $message = $nearest
+                    ? sprintf(
+                        'Sorry, that address is about %s miles from our %s location, which delivers up to %s miles. Try ordering for pickup!',
+                        number_format($nearest['distance'], 1),
+                        $nearest['store']->name,
+                        rtrim(rtrim(number_format((float) $nearest['store']->delivery_radius, 1), '0'), '.')
+                    )
+                    : 'Sorry, that address is outside our delivery area. Try ordering for pickup!';
+
+                return $this->deliveryUnavailable($request, $message);
+            }
+
+            $store = $match['store'];
+            $distance = round($match['distance'], 2);
 
             session([
                 'order_location' => [
