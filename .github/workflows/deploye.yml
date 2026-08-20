@@ -12,6 +12,28 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # Assets are built here rather than committed, so the repo stays clean
+      # and a push always deploys freshly compiled CSS/JS.
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build assets
+        run: npm run build
+
+      # The document root is public_html, and bootstrap/app.php looks for the
+      # manifest at public_html/build/manifest.json. Vite writes to
+      # public/build, so move it up one level to match.
+      - name: Move build output to deploy location
+        run: |
+          rm -rf ./build
+          mv ./public/build ./build
+
       - name: Deploy via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
@@ -20,3 +42,20 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           local-dir: ./
           server-dir: ./public_html/
+          # Excluded paths are skipped entirely — never uploaded and never
+          # deleted — so the server's own .env and storage stay untouched.
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
+            **/.github/**
+            **/tests/**
+            **/storage/framework/cache/**
+            **/storage/framework/sessions/**
+            **/storage/framework/views/**
+            **/storage/logs/**
+            **/.env
+            **/.env.*
+            **/*.md
+            **/phpunit.xml
+            **/vite.config.js
