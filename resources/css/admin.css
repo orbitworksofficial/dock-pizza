@@ -4,7 +4,9 @@
    dark mode re-declares the same tokens and nothing else changes.
    ═══════════════════════════════════════════════════════════════ */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+/* Inter is loaded via <link> in the admin layout head, not an @import, so
+   this file can be concatenated into app.css without an out-of-order
+   @import rule (which browsers drop silently). */
 
 /* ── Tokens ──────────────────────────────────────────────────── */
 

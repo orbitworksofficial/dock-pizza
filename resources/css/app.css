@@ -1,5 +1,10 @@
 @import 'tailwindcss';
 
+/* Admin design system. Folded into this bundle rather than shipped as a
+   separate entry point, so the admin never depends on a second manifest
+   entry reaching the server. Admin styles are scoped under body.admin. */
+@import './admin.css';
+
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 @source '../**/*.blade.php';

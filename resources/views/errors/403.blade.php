@@ -1,11 +1,11 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex, nofollow">
-    <title>Access denied · {{ config('seo.organization.name', 'Site') }}</title>
+    <title>Access denied &middot; {{ config('seo.organization.name', 'Site') }}</title>
 
     <script>
         (function () {
@@ -18,7 +18,7 @@
     </script>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    @vite(['resources/css/admin.css'])
+    @vite(['resources/css/app.css'])
 </head>
 
 <body class="admin">

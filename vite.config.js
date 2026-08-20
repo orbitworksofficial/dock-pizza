@@ -5,14 +5,10 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
     plugins: [
         laravel({
-            input: [
-                'resources/css/app.css',
-                'resources/js/app.js',
-                // Admin ships its own bundle so the storefront does not pay
-                // for the design system, and vice versa.
-                'resources/css/admin.css',
-                'resources/js/admin.js',
-            ],
+            // A single entry point. The admin design system is imported into
+            // app.css and its helpers into app.js, so the admin never depends
+            // on a second manifest entry reaching the server.
+            input: ['resources/css/app.css', 'resources/js/app.js'],
             refresh: true,
         }),
         tailwindcss(),
