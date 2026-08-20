@@ -39,4 +39,23 @@ return [
         'maps_api_key' => env('GOOGLE_MAPS_API_KEY'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Analytics
+    |--------------------------------------------------------------------------
+    |
+    | GTM is the only tag loader when GTM_ID is set; GA4 loads directly only
+    | when it is not. Loading both double-counts every pageview, so the
+    | exclusivity is enforced in the layout rather than left to configuration.
+    |
+    */
+
+    'gtm' => [
+        'id' => env('GTM_ID'),
+    ],
+
+    'ga' => [
+        'id' => env('GA_ID'),
+    ],
+
 ];

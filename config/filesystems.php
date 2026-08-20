@@ -17,6 +17,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Admin Upload Disk
+    |--------------------------------------------------------------------------
+    |
+    | Where admin image uploads are written. ImageUploadService refuses to run
+    | if this names a cloud disk whose credentials are missing, rather than
+    | silently writing to storage that may not survive a deploy.
+    |
+    */
+
+    'seo_disk' => env('SEO_UPLOAD_DISK', 'public'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Filesystem Disks
     |--------------------------------------------------------------------------
     |

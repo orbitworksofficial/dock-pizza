@@ -53,3 +53,21 @@ Route::middleware('auth')->group(function () {
 // Catering
 Route::get('/catering', [CateringController::class, 'index'])->name('catering.index');
 Route::post('/catering', [CateringController::class, 'submit'])->name('catering.submit');
+
+// Generated from routes + content, never hand-edited files
+Route::get('/sitemap.xml', [\App\Http\Controllers\SitemapController::class, 'sitemap'])->name('sitemap');
+Route::get('/robots.txt', [\App\Http\Controllers\SitemapController::class, 'robots'])->name('robots');
+
+// Admin
+Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('/seo', [\App\Http\Controllers\Admin\PageSeoController::class, 'index'])->name('seo.index');
+    Route::get('/seo/create', [\App\Http\Controllers\Admin\PageSeoController::class, 'create'])->name('seo.create');
+    Route::post('/seo', [\App\Http\Controllers\Admin\PageSeoController::class, 'store'])->name('seo.store');
+    Route::get('/seo/{seo}/edit', [\App\Http\Controllers\Admin\PageSeoController::class, 'edit'])->name('seo.edit');
+    Route::put('/seo/{seo}', [\App\Http\Controllers\Admin\PageSeoController::class, 'update'])->name('seo.update');
+    Route::delete('/seo/{seo}', [\App\Http\Controllers\Admin\PageSeoController::class, 'destroy'])->name('seo.destroy');
+
+    Route::get('/seo-technical', [\App\Http\Controllers\Admin\TechnicalSeoController::class, 'index'])->name('seo.technical');
+
+    Route::post('/uploads/image', [\App\Http\Controllers\Admin\ImageUploadController::class, 'store'])->name('uploads.image');
+});

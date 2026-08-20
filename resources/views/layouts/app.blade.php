@@ -6,10 +6,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>@yield('title', 'Dock Pizza — Fresh off the dock')</title>
+    {{-- Consent defaults and the tag loader must come before everything else --}}
+    @include('partials.analytics-head')
 
-    <meta name="description"
-        content="@yield('meta_description', 'Premium specialty pizzas, fresh salads, and crispy sides. Order online for delivery or pickup at Dock Pizza.')">
+    @isset($seo)
+        @include('partials.seo-head')
+    @else
+        {{-- Composer did not run (non-standard render path): still never blank --}}
+        <title>@yield('title', config('seo.defaults.title'))</title>
+        <meta name="description" content="@yield('meta_description', config('seo.defaults.description'))">
+    @endisset
 
     <link rel="icon" type="image/png"
         href="{{ asset('assets/images/dock-pizza-logo.png') }}@if(file_exists(public_path('assets/images/dock-pizza-logo.png')))?v={{ filemtime(public_path('assets/images/dock-pizza-logo.png')) }}@endif">
@@ -34,6 +40,8 @@
 <body class="bg-[#F9F9FB] text-[#1E1E1E] font-sans antialiased overflow-x-clip"
     x-data="{ mobileMenuOpen: false, cartOpen: false, locationModalOpen: false }"
     @add-to-cart.window="if($event.detail) { $store.cart.add($event.detail); cartOpen = true }" @cart-updated.window="">
+
+    @include('partials.analytics-body')
 
     <!-- Navigation Header (Cheezious Style) -->
     <header class="sticky top-0 z-50 w-full bg-white border-b border-stone-100 header-shadow">
@@ -760,6 +768,8 @@
             src="https://maps.googleapis.com/maps/api/js?key={{ config('services.google.maps_api_key') }}&libraries=places&callback=initDockGooglePlaces"
             async defer></script>
     @endif
+
+    @include('partials.cookie-banner')
 </body>
 
 </html>

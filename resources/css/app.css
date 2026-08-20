@@ -179,6 +179,52 @@ body {
     transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/* Hide Alpine-controlled elements until Alpine initialises */
+[x-cloak] {
+    display: none !important;
+}
+
+/* Admin form primitives */
+.admin-label {
+    display: block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #57534e;
+    margin-bottom: 0.5rem;
+}
+
+.admin-input {
+    width: 100%;
+    background: #F3F4F6;
+    border: 1px solid transparent;
+    border-radius: 0.75rem;
+    padding: 0.65rem 0.9rem;
+    font-size: 0.875rem;
+    color: #1E1E1E;
+    transition: background-color 0.15s, border-color 0.15s;
+}
+
+.admin-input:focus {
+    outline: none;
+    background: #fff;
+    border-color: #FDB813;
+}
+
+.admin-hint {
+    font-size: 0.7rem;
+    color: #a8a29e;
+    margin-top: 0.4rem;
+    line-height: 1.5;
+}
+
+.admin-hint code {
+    background: #f5f5f4;
+    padding: 0.05rem 0.3rem;
+    border-radius: 0.25rem;
+}
+
 /* Google Places dropdown above modals */
 .pac-container {
     z-index: 10050 !important;
