@@ -1,117 +1,128 @@
 @extends('admin.layout')
-@section('admin_title', 'Technical SEO')
 
-@section('admin_content')
-    <div class="mb-6">
-        <h1 class="text-2xl font-bold tracking-tight">Technical SEO</h1>
-        <p class="text-sm text-stone-500 mt-1">
-            Read-only. Everything here is generated — edit the source, not the output.
-        </p>
-    </div>
+@section('title', 'Technical SEO')
+@section('page_title', 'Technical SEO')
+@section('page_sub', 'Read-only — everything here is generated')
+
+@section('content')
 
     {{-- Analytics --}}
-    <section class="bg-white border border-stone-200 rounded-2xl p-6 mb-5">
-        <h2 class="text-sm font-bold uppercase tracking-wider text-stone-500 mb-4">Analytics</h2>
-
-        <div class="flex items-center gap-3 mb-4">
-            <span class="text-xs font-bold px-2.5 py-1.5 rounded-lg {{ $analytics['loader'] === 'None' ? 'bg-stone-100 text-stone-600' : 'bg-emerald-50 text-emerald-700' }}">
-                {{ $analytics['loader'] }}
+    <div class="card">
+        <div class="card__head">
+            <div>
+                <div class="card__title">Analytics</div>
+                <div class="card__sub">Which tag loader is active, and why</div>
+            </div>
+            <span class="pill {{ $analytics['loader'] === 'None' ? 'pill--neutral' : 'pill--ok' }}">
+                <span class="pill__dot"></span>{{ $analytics['loader'] }}
             </span>
         </div>
+        <div class="card__body">
+            <p class="small muted" style="margin-bottom:14px;">{{ $analytics['reason'] }}</p>
 
-        <p class="text-xs text-stone-500 mb-4">{{ $analytics['reason'] }}</p>
-
-        <dl class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-            <div>
-                <dt class="text-xs font-bold text-stone-400 uppercase tracking-wider mb-1">GTM_ID</dt>
-                <dd class="font-mono text-xs">{{ $analytics['gtm_id'] ?: '— not set —' }}</dd>
-            </div>
-            <div>
-                <dt class="text-xs font-bold text-stone-400 uppercase tracking-wider mb-1">GA_ID</dt>
-                <dd class="font-mono text-xs">
-                    {{ $analytics['ga_id'] ?: '— not set —' }}
+            <div class="field-row">
+                <div>
+                    <div class="field__label">GTM_ID</div>
+                    <div class="mono">{{ $analytics['gtm_id'] ?: '— not set —' }}</div>
+                </div>
+                <div>
+                    <div class="field__label">GA_ID</div>
+                    <div class="mono">{{ $analytics['ga_id'] ?: '— not set —' }}</div>
                     @if($analytics['gtm_id'] && $analytics['ga_id'])
-                        <span class="block mt-1 text-amber-600">
+                        <div class="field__hint" style="color:var(--warn);">
                             Ignored while GTM is active, so pageviews cannot double-count.
-                        </span>
+                        </div>
                     @endif
-                </dd>
+                </div>
             </div>
-        </dl>
-    </section>
+        </div>
+    </div>
 
     {{-- sameAs --}}
-    <section class="bg-white border border-stone-200 rounded-2xl p-6 mb-5">
-        <h2 class="text-sm font-bold uppercase tracking-wider text-stone-500 mb-2">Social profiles (sameAs)</h2>
-        <p class="text-xs text-stone-500 mb-4">
-            Source: <code class="bg-stone-100 px-1.5 py-0.5 rounded">config/seo.php</code> →
-            <code class="bg-stone-100 px-1.5 py-0.5 rounded">social</code>.
-            Tracking parameters are stripped before output, because sameAs matches on the exact URL.
-        </p>
-
-        @forelse($sameAs as $network => $url)
-            <div class="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 py-2 border-b border-stone-100 last:border-0">
-                <span class="text-xs font-bold uppercase tracking-wider text-stone-400 w-24 flex-shrink-0">{{ $network }}</span>
-                <code class="text-xs break-all">{{ $url }}</code>
-                @if(($rawSocial[$network] ?? '') !== $url)
-                    <span class="text-[11px] text-amber-600 flex-shrink-0">cleaned</span>
-                @endif
+    <div class="card" style="margin-top:14px;">
+        <div class="card__head">
+            <div>
+                <div class="card__title">Social profiles (sameAs)</div>
+                <div class="card__sub">
+                    From <code class="mono">config/seo.php</code>. Tracking parameters are stripped,
+                    because sameAs matches on the exact URL.
+                </div>
             </div>
-        @empty
-            <p class="text-sm text-stone-400 italic">No social profiles configured.</p>
-        @endforelse
-    </section>
+        </div>
+        <div class="card__body">
+            @forelse($sameAs as $network => $url)
+                <div class="row" style="padding:7px 0; border-bottom:1px solid var(--line); gap:14px;">
+                    <span class="small" style="width:88px; font-weight:600; text-transform:capitalize; flex-shrink:0;">{{ $network }}</span>
+                    <code class="mono" style="flex:1; min-width:0; word-break:break-all;">{{ $url }}</code>
+                    @if(($rawSocial[$network] ?? '') !== $url)
+                        <span class="pill pill--warn">cleaned</span>
+                    @endif
+                </div>
+            @empty
+                <p class="muted small"><em>No social profiles configured.</em></p>
+            @endforelse
+        </div>
+    </div>
 
     {{-- robots.txt --}}
-    <section class="bg-white border border-stone-200 rounded-2xl p-6 mb-5">
-        <div class="flex items-baseline justify-between gap-4 mb-2">
-            <h2 class="text-sm font-bold uppercase tracking-wider text-stone-500">robots.txt</h2>
-            <a href="{{ url('/robots.txt') }}" target="_blank" rel="noopener"
-               class="text-xs font-bold text-[#B4530A] hover:underline">View live</a>
+    <div class="card" style="margin-top:14px;">
+        <div class="card__head">
+            <div>
+                <div class="card__title">robots.txt</div>
+                <div class="card__sub">Generated by <code class="mono">SitemapController@robots</code></div>
+            </div>
+            <a href="{{ url('/robots.txt') }}" target="_blank" rel="noopener" class="btn btn--ghost btn--sm">
+                View live <i class="fa-solid fa-arrow-up-right-from-square" style="font-size:9px;"></i>
+            </a>
         </div>
-        <p class="text-xs text-stone-500 mb-4">
-            Generated by <code class="bg-stone-100 px-1.5 py-0.5 rounded">SitemapController@robots</code>.
-        </p>
-        <pre class="bg-stone-900 text-stone-100 rounded-xl p-4 text-xs overflow-x-auto">{{ $robots }}</pre>
-    </section>
+        <div class="card__body">
+            <pre class="mono" style="background:var(--surface-2); border:1px solid var(--line); border-radius:var(--radius); padding:13px; overflow-x:auto; margin:0; line-height:1.6;">{{ $robots }}</pre>
+        </div>
+    </div>
 
     {{-- sitemap --}}
-    <section class="bg-white border border-stone-200 rounded-2xl p-6 mb-5">
-        <div class="flex items-baseline justify-between gap-4 mb-2">
-            <h2 class="text-sm font-bold uppercase tracking-wider text-stone-500">
-                sitemap.xml <span class="text-stone-400 font-medium normal-case">({{ count($sitemapUrls) }} URLs)</span>
-            </h2>
-            <a href="{{ url('/sitemap.xml') }}" target="_blank" rel="noopener"
-               class="text-xs font-bold text-[#B4530A] hover:underline">View live</a>
+    <div class="card" style="margin-top:14px;">
+        <div class="card__head">
+            <div>
+                <div class="card__title">sitemap.xml <span class="muted" style="font-weight:400;">· {{ count($sitemapUrls) }} URLs</span></div>
+                <div class="card__sub">
+                    Static routes plus active products. <code class="mono">noindex</code> pages are excluded.
+                    Blog posts are not included — no blog routes exist yet.
+                </div>
+            </div>
+            <a href="{{ url('/sitemap.xml') }}" target="_blank" rel="noopener" class="btn btn--ghost btn--sm">
+                View live <i class="fa-solid fa-arrow-up-right-from-square" style="font-size:9px;"></i>
+            </a>
         </div>
-        <p class="text-xs text-stone-500 mb-4">
-            Built from static routes plus active products. Pages marked <code class="bg-stone-100 px-1.5 py-0.5 rounded">noindex</code>
-            are excluded. Blog posts are not included — no blog routes exist yet.
-        </p>
-
-        <div class="max-h-80 overflow-y-auto border border-stone-100 rounded-xl">
-            <table class="w-full text-xs">
-                <tbody class="divide-y divide-stone-100">
+        <div class="tablescroll" style="max-height:320px;">
+            <table class="table">
+                <tbody>
                     @foreach($sitemapUrls as $url)
                         <tr>
-                            <td class="px-3 py-2 font-mono break-all">{{ $url['loc'] }}</td>
-                            <td class="px-3 py-2 text-stone-400 whitespace-nowrap text-right">{{ $url['priority'] }}</td>
+                            <td class="mono" style="word-break:break-all;">{{ $url['loc'] }}</td>
+                            <td class="table__actions muted small">{{ $url['priority'] }}</td>
                         </tr>
                     @endforeach
                 </tbody>
             </table>
         </div>
-    </section>
+    </div>
 
-    {{-- Site-wide graph --}}
-    <section class="bg-white border border-stone-200 rounded-2xl p-6">
-        <h2 class="text-sm font-bold uppercase tracking-wider text-stone-500 mb-2">Site-wide structured data</h2>
-        <p class="text-xs text-stone-500 mb-4">
-            Emitted on every page as one <code class="bg-stone-100 px-1.5 py-0.5 rounded">@@graph</code>.
-            Source: <code class="bg-stone-100 px-1.5 py-0.5 rounded">config/seo.php</code> via
-            <code class="bg-stone-100 px-1.5 py-0.5 rounded">SchemaGraphBuilder</code>.
-            Shown here as rendered for the homepage.
-        </p>
-        <pre class="bg-stone-900 text-stone-100 rounded-xl p-4 text-xs overflow-x-auto max-h-96">{{ $graph }}</pre>
-    </section>
+    {{-- Graph --}}
+    <div class="card" style="margin-top:14px;">
+        <div class="card__head">
+            <div>
+                <div class="card__title">Site-wide structured data</div>
+                <div class="card__sub">
+                    One <code class="mono">@@graph</code> on every page, from
+                    <code class="mono">config/seo.php</code> via <code class="mono">SchemaGraphBuilder</code>.
+                    Shown as rendered for the homepage.
+                </div>
+            </div>
+        </div>
+        <div class="card__body">
+            <pre class="mono" style="background:var(--surface-2); border:1px solid var(--line); border-radius:var(--radius); padding:13px; overflow-x:auto; max-height:400px; margin:0; line-height:1.55;">{{ $graph }}</pre>
+        </div>
+    </div>
+
 @endsection

@@ -58,7 +58,26 @@ Route::post('/catering', [CateringController::class, 'submit'])->name('catering.
 Route::get('/sitemap.xml', [\App\Http\Controllers\SitemapController::class, 'sitemap'])->name('sitemap');
 Route::get('/robots.txt', [\App\Http\Controllers\SitemapController::class, 'robots'])->name('robots');
 
-// Admin
+// ── Admin ────────────────────────────────────────────────────
+Route::prefix('admin')->name('admin.')->group(function () {
+    // Auth (guest)
+    Route::middleware('guest')->group(function () {
+        Route::get('/login', [\App\Http\Controllers\Admin\AuthController::class, 'showLogin'])->name('login');
+        Route::post('/login', [\App\Http\Controllers\Admin\AuthController::class, 'login'])->name('login.attempt');
+    });
+});
+
+// Author-level: authors and admins. Controllers still check per-record
+// ownership — this only decides who may reach the door.
+Route::middleware(['auth', 'admin:author'])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('/', [\App\Http\Controllers\Admin\DashboardController::class, 'index'])->name('dashboard');
+
+    Route::post('/uploads/image', [\App\Http\Controllers\Admin\ImageUploadController::class, 'store'])->name('uploads.image');
+
+    Route::post('/logout', [\App\Http\Controllers\Admin\AuthController::class, 'logout'])->name('logout');
+});
+
+// Admin-only: site-wide settings authors must not change.
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/seo', [\App\Http\Controllers\Admin\PageSeoController::class, 'index'])->name('seo.index');
     Route::get('/seo/create', [\App\Http\Controllers\Admin\PageSeoController::class, 'create'])->name('seo.create');
@@ -68,6 +87,4 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::delete('/seo/{seo}', [\App\Http\Controllers\Admin\PageSeoController::class, 'destroy'])->name('seo.destroy');
 
     Route::get('/seo-technical', [\App\Http\Controllers\Admin\TechnicalSeoController::class, 'index'])->name('seo.technical');
-
-    Route::post('/uploads/image', [\App\Http\Controllers\Admin\ImageUploadController::class, 'store'])->name('uploads.image');
 });

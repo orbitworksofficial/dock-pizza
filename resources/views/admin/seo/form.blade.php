@@ -1,241 +1,244 @@
 @extends('admin.layout')
-@section('admin_title', $seo->exists ? 'Edit ' . $seo->page_key : 'Add page')
+
+@section('title', $seo->exists ? 'Edit ' . $seo->page_key : 'Add page')
+@section('page_title', $seo->exists ? ($seo->page_name ?: $seo->page_key) : 'Add page')
+@section('page_sub', $seo->exists ? $seo->page_key : 'Configure search and social metadata')
 
 @php
     $limits = config('seo.limits');
-    $oldFaqs = old('faqs', $faqs ?: [['question' => '', 'answer' => '']]);
-    $input = fn (string $field, $fallback = '') => old($field, $seo->{$field} ?? $fallback);
+    $oldFaqs = array_values(old('faqs', $faqs ?: [['question' => '', 'answer' => '']]));
+    $val = fn (string $f, $d = '') => old($f, $seo->{$f} ?? $d);
+
+    // Resolve per-row FAQ errors here so the template stays declarative.
+    // Indexes match the rows the editor sees, because validation runs before
+    // blank rows are filtered out.
+    $faqErrors = [];
+    foreach ($errors->getMessages() as $key => $messages) {
+        if (preg_match('/^faqs\.(\d+)\.(question|answer)$/', $key, $m)) {
+            $faqErrors[(int) $m[1]][$m[2]] = $messages[0];
+        }
+    }
 @endphp
 
-@section('admin_content')
-<form method="POST"
+@section('page_actions')
+    <a href="{{ route('admin.seo.index') }}" class="btn btn--ghost">Cancel</a>
+    <button type="submit" form="seo-form" class="btn btn--primary">Save</button>
+@endsection
+
+@section('content')
+<form id="seo-form" method="POST"
       action="{{ $seo->exists ? route('admin.seo.update', $seo) : route('admin.seo.store') }}"
-      x-data="seoForm({{ Js::from(['faqs' => array_values($oldFaqs), 'limits' => $limits]) }})">
+      x-data="{ faqs: {{ Js::from($oldFaqs) }},
+                faqErrors: {{ Js::from($faqErrors) }},
+                addFaq() { this.faqs.push({ question: '', answer: '' }) },
+                removeFaq(i) { this.faqs.splice(i, 1); this.faqErrors = {}; if (!this.faqs.length) this.addFaq() },
+                errFor(i, f) { return (this.faqErrors[i] || {})[f] || '' } }">
     @csrf
     @if($seo->exists) @method('PUT') @endif
 
-    <div class="flex items-center justify-between gap-4 mb-6">
-        <div>
-            <h1 class="text-2xl font-bold tracking-tight">
-                {{ $seo->exists ? ($seo->page_name ?: $seo->page_key) : 'Add page' }}
-            </h1>
-            @if($seo->exists)
-                <code class="text-xs text-stone-400">{{ $seo->page_key }}</code>
-            @endif
+    {{-- ── Page identity ───────────────────────────────────── --}}
+    <div class="card">
+        <div class="card__head">
+            <div><div class="card__title">Page</div></div>
         </div>
-        <div class="flex items-center gap-3 flex-shrink-0">
-            <a href="{{ route('admin.seo.index') }}" class="text-xs font-bold text-stone-500 hover:text-stone-900">Cancel</a>
-            <button type="submit" class="btn-yellow px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider">
-                Save
-            </button>
+        <div class="card__body">
+            <div class="field-row">
+                <x-admin.field name="page_key" label="Page key" required
+                               hint="The route path. Must start with <code>/</code>.">
+                    <input type="text" name="page_key" id="page-key" class="input mono"
+                           value="{{ old('page_key', $seo->page_key ?? request('page_key', '')) }}"
+                           placeholder="/services" required>
+                </x-admin.field>
+
+                <x-admin.field name="page_name" label="Page name" required
+                               hint="Internal label, shown in this dashboard only.">
+                    <input type="text" name="page_name" id="page-name" class="input"
+                           value="{{ $val('page_name') }}" placeholder="Services" required>
+                </x-admin.field>
+            </div>
         </div>
     </div>
 
-    {{-- ── Page identity ─────────────────────────────────────── --}}
-    <section class="bg-white border border-stone-200 rounded-2xl p-6 mb-5">
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+    {{-- ── Search engine listing ───────────────────────────── --}}
+    <div class="card" style="margin-top:14px;">
+        <div class="card__head">
             <div>
-                <label for="page_key" class="admin-label">Page key</label>
-                <input type="text" name="page_key" id="page_key" required
-                       value="{{ old('page_key', $seo->page_key ?? request('page_key', '')) }}"
-                       placeholder="/services" class="admin-input font-mono">
-                <p class="admin-hint">The route path. Must start with <code>/</code>.</p>
-            </div>
-            <div>
-                <label for="page_name" class="admin-label">Page name</label>
-                <input type="text" name="page_name" id="page_name" required
-                       value="{{ $input('page_name') }}" placeholder="Services" class="admin-input">
-                <p class="admin-hint">Internal label, shown in this dashboard only.</p>
+                <div class="card__title">Search engine listing</div>
+                <div class="card__sub">How this page appears in results</div>
             </div>
         </div>
-    </section>
+        <div class="card__body">
+            <x-admin.field name="meta_title" label="Title"
+                           :counter="['warn' => $limits['title_warn'], 'max' => $limits['title']]"
+                           :value="$seo->meta_title"
+                           hint="Google truncates past ~{{ $limits['title_warn'] }} characters. Leave blank to use the hardcoded default.">
+                <input type="text" name="meta_title" id="meta-title" class="input"
+                       x-model="value" maxlength="{{ $limits['title'] }}">
+            </x-admin.field>
 
-    {{-- ── Search engine listing ─────────────────────────────── --}}
-    <section class="bg-white border border-stone-200 rounded-2xl p-6 mb-5">
-        <h2 class="text-sm font-bold uppercase tracking-wider text-stone-500 mb-5">Search engine listing</h2>
+            <x-admin.field name="meta_description" label="Meta description"
+                           :counter="['warn' => $limits['description_warn'], 'max' => $limits['description']]"
+                           :value="$seo->meta_description"
+                           hint="Truncated past ~{{ $limits['description_warn'] }} characters.">
+                <textarea name="meta_description" id="meta-description" class="textarea" rows="3"
+                          x-model="value" maxlength="{{ $limits['description'] }}"></textarea>
+            </x-admin.field>
 
-        <div class="space-y-5">
-            <div>
-                <div class="flex items-baseline justify-between gap-3">
-                    <label for="meta_title" class="admin-label">Title</label>
-                    <span class="text-[11px] font-mono" :class="counterClass(title.length, {{ $limits['title_warn'] }}, {{ $limits['title'] }})"
-                          x-text="`${title.length} / {{ $limits['title_warn'] }}`"></span>
-                </div>
-                <input type="text" name="meta_title" id="meta_title" x-model="title"
-                       maxlength="{{ $limits['title'] }}"
-                       value="{{ $input('meta_title') }}" class="admin-input">
-                <p class="admin-hint">
-                    Google truncates past ~{{ $limits['title_warn'] }} characters. Leave blank to use the hardcoded default.
-                </p>
-            </div>
+            <div class="field-row">
+                <x-admin.field name="meta_keywords" label="Keywords">
+                    <input type="text" name="meta_keywords" id="meta-keywords" class="input"
+                           value="{{ $val('meta_keywords') }}">
+                </x-admin.field>
 
-            <div>
-                <div class="flex items-baseline justify-between gap-3">
-                    <label for="meta_description" class="admin-label">Meta description</label>
-                    <span class="text-[11px] font-mono" :class="counterClass(description.length, {{ $limits['description_warn'] }}, {{ $limits['description'] }})"
-                          x-text="`${description.length} / {{ $limits['description_warn'] }}`"></span>
-                </div>
-                <textarea name="meta_description" id="meta_description" rows="3" x-model="description"
-                          maxlength="{{ $limits['description'] }}" class="admin-input">{{ $input('meta_description') }}</textarea>
-                <p class="admin-hint">Truncated past ~{{ $limits['description_warn'] }} characters.</p>
-            </div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <div>
-                    <label for="meta_keywords" class="admin-label">Keywords</label>
-                    <input type="text" name="meta_keywords" id="meta_keywords"
-                           value="{{ $input('meta_keywords') }}" class="admin-input">
-                </div>
-                <div>
-                    <label for="robots" class="admin-label">Robots</label>
-                    <select name="robots" id="robots" class="admin-input">
-                        @foreach(['index, follow', 'noindex, follow', 'index, nofollow', 'noindex, nofollow'] as $option)
-                            <option value="{{ $option }}" @selected($input('robots', 'index, follow') === $option)>{{ $option }}</option>
+                <x-admin.field name="robots" label="Robots">
+                    <select name="robots" id="robots" class="select">
+                        @foreach(['index, follow', 'noindex, follow', 'index, nofollow', 'noindex, nofollow'] as $o)
+                            <option value="{{ $o }}" @selected($val('robots', 'index, follow') === $o)>{{ $o }}</option>
                         @endforeach
                     </select>
-                </div>
+                </x-admin.field>
             </div>
 
-            <div>
-                <label for="canonical_url" class="admin-label">Canonical URL</label>
-                <input type="url" name="canonical_url" id="canonical_url"
-                       value="{{ $input('canonical_url') }}" placeholder="{{ url('/') }}/services" class="admin-input">
-                <p class="admin-hint">Leave blank to use this page's own URL.</p>
-            </div>
+            <x-admin.field name="canonical_url" label="Canonical URL"
+                           hint="Leave blank to use this page's own URL.">
+                <input type="url" name="canonical_url" id="canonical-url" class="input"
+                       value="{{ $val('canonical_url') }}" placeholder="{{ url('/') }}/services">
+            </x-admin.field>
         </div>
-    </section>
+    </div>
 
-    {{-- ── Social sharing (collapsible) ──────────────────────── --}}
-    <section class="bg-white border border-stone-200 rounded-2xl mb-5 overflow-hidden" x-data="{ open: false }">
-        <button type="button" @click="open = !open"
-                class="w-full flex items-center justify-between gap-4 px-6 py-4 text-left">
-            <span class="text-sm font-bold uppercase tracking-wider text-stone-500">Social sharing</span>
-            <i class="fa-solid fa-chevron-down text-xs text-stone-400 transition-transform" :class="open && 'rotate-180'"></i>
+    {{-- ── Social sharing ──────────────────────────────────── --}}
+    <div class="collapse" style="margin-top:14px;" x-data="{ open: {{ $errors->hasAny(['og_title','og_description','og_image','og_type','twitter_title','twitter_description','twitter_image','twitter_card']) ? 'true' : 'false' }} }">
+        <button type="button" class="collapse__trigger" @click="open = !open" :aria-expanded="open">
+            <span>Social sharing
+                <span class="collapse__meta">— blank fields fall back to the title and description above</span>
+            </span>
+            <i class="collapse__chevron fa-solid fa-chevron-down"></i>
         </button>
 
-        <div x-show="open" x-cloak class="px-6 pb-6 space-y-5 border-t border-stone-100 pt-5">
-            <p class="text-xs text-stone-500">Leave any field blank to inherit from the search listing above.</p>
+        <div class="collapse__body" x-show="open" x-cloak>
+            <div class="field-row">
+                <x-admin.field name="og_title" label="OG title" hint="Falls back to the page title.">
+                    <input type="text" name="og_title" id="og-title" class="input" value="{{ $val('og_title') }}">
+                </x-admin.field>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <div>
-                    <label for="og_title" class="admin-label">OG title</label>
-                    <input type="text" name="og_title" id="og_title" value="{{ $input('og_title') }}" class="admin-input">
-                </div>
-                <div>
-                    <label for="og_type" class="admin-label">OG type</label>
-                    <input type="text" name="og_type" id="og_type" value="{{ $input('og_type', 'website') }}" class="admin-input">
-                </div>
+                <x-admin.field name="og_type" label="OG type">
+                    <input type="text" name="og_type" id="og-type" class="input" value="{{ $val('og_type', 'website') }}">
+                </x-admin.field>
             </div>
 
-            <div>
-                <label for="og_description" class="admin-label">OG description</label>
-                <textarea name="og_description" id="og_description" rows="2" class="admin-input">{{ $input('og_description') }}</textarea>
-            </div>
+            <x-admin.field name="og_description" label="OG description" hint="Falls back to the meta description.">
+                <textarea name="og_description" id="og-description" class="textarea" rows="2">{{ $val('og_description') }}</textarea>
+            </x-admin.field>
 
-            <div>
-                <label for="og_image" class="admin-label">OG image URL</label>
-                <input type="text" name="og_image" id="og_image" value="{{ $input('og_image') }}" class="admin-input">
-                <p class="admin-hint">A real image file — not the homepage URL. 1200×630 works best.</p>
-            </div>
+            <x-admin.field name="og_image" label="OG image URL"
+                           hint="A real image file, not the homepage URL. 1200×630 works best.">
+                <input type="text" name="og_image" id="og-image" class="input" value="{{ $val('og_image') }}">
+            </x-admin.field>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-2 border-t border-stone-100">
-                <div>
-                    <label for="twitter_title" class="admin-label">Twitter title</label>
-                    <input type="text" name="twitter_title" id="twitter_title" value="{{ $input('twitter_title') }}" class="admin-input">
-                </div>
-                <div>
-                    <label for="twitter_card" class="admin-label">Twitter card</label>
-                    <select name="twitter_card" id="twitter_card" class="admin-input">
-                        @foreach(['summary_large_image', 'summary'] as $option)
-                            <option value="{{ $option }}" @selected($input('twitter_card', 'summary_large_image') === $option)>{{ $option }}</option>
+            <hr style="border:none; border-top:1px solid var(--line); margin:18px 0;">
+
+            <div class="field-row">
+                <x-admin.field name="twitter_title" label="Twitter title" hint="Falls back to the OG title, then the page title.">
+                    <input type="text" name="twitter_title" id="twitter-title" class="input" value="{{ $val('twitter_title') }}">
+                </x-admin.field>
+
+                <x-admin.field name="twitter_card" label="Twitter card">
+                    <select name="twitter_card" id="twitter-card" class="select">
+                        @foreach(['summary_large_image', 'summary'] as $o)
+                            <option value="{{ $o }}" @selected($val('twitter_card', 'summary_large_image') === $o)>{{ $o }}</option>
                         @endforeach
                     </select>
+                </x-admin.field>
+            </div>
+
+            <x-admin.field name="twitter_description" label="Twitter description" hint="Falls back to the OG description.">
+                <textarea name="twitter_description" id="twitter-description" class="textarea" rows="2">{{ $val('twitter_description') }}</textarea>
+            </x-admin.field>
+
+            <x-admin.field name="twitter_image" label="Twitter image URL" hint="Falls back to the OG image.">
+                <input type="text" name="twitter_image" id="twitter-image" class="input" value="{{ $val('twitter_image') }}">
+            </x-admin.field>
+        </div>
+    </div>
+
+    {{-- ── FAQs ────────────────────────────────────────────── --}}
+    <div class="card" style="margin-top:14px;">
+        <div class="card__head">
+            <div>
+                <div class="card__title">FAQs</div>
+                <div class="card__sub">
+                    Rendered visibly on the page <strong>and</strong> used to generate FAQPage structured data.
+                    Google only credits markup whose answers are visible. Empty rows are ignored.
                 </div>
             </div>
-
-            <div>
-                <label for="twitter_description" class="admin-label">Twitter description</label>
-                <textarea name="twitter_description" id="twitter_description" rows="2" class="admin-input">{{ $input('twitter_description') }}</textarea>
-            </div>
-
-            <div>
-                <label for="twitter_image" class="admin-label">Twitter image URL</label>
-                <input type="text" name="twitter_image" id="twitter_image" value="{{ $input('twitter_image') }}" class="admin-input">
-            </div>
         </div>
-    </section>
 
-    {{-- ── FAQs ──────────────────────────────────────────────── --}}
-    <section class="bg-white border border-stone-200 rounded-2xl p-6 mb-5">
-        <h2 class="text-sm font-bold uppercase tracking-wider text-stone-500 mb-2">FAQs</h2>
-        <p class="text-xs text-stone-500 mb-5">
-            These render visibly on the page <strong>and</strong> generate the FAQPage structured data.
-            Google only credits FAQ markup whose answers are visible, so both come from these rows.
-            Empty rows are ignored.
-        </p>
-
-        <div class="space-y-4">
-            <template x-for="(faq, index) in faqs" :key="index">
-                <div class="border border-stone-200 rounded-xl p-4 bg-stone-50/50">
-                    <div class="flex items-center justify-between mb-3">
-                        <span class="text-xs font-bold text-stone-400" x-text="`FAQ #${index + 1}`"></span>
-                        <button type="button" @click="removeFaq(index)"
-                                class="text-xs font-bold text-rose-600 hover:text-rose-800"
-                                x-show="faqs.length > 1">
-                            Remove
-                        </button>
+        <div class="card__body">
+            <template x-for="(faq, i) in faqs" :key="i">
+                <div style="border:1px solid var(--line); border-radius:var(--radius); padding:14px; margin-bottom:10px; background:var(--surface-2);">
+                    <div class="row-between" style="margin-bottom:10px;">
+                        <span class="small muted" style="font-weight:600;" x-text="`FAQ #${i + 1}`"></span>
+                        <button type="button" class="btn btn--link" style="color:var(--danger);"
+                                @click="removeFaq(i)" x-show="faqs.length > 1">Remove</button>
                     </div>
-                    <input type="text" :name="`faqs[${index}][question]`" x-model="faq.question"
-                           placeholder="Question" maxlength="{{ $limits['faq_question'] }}"
-                           class="admin-input mb-3">
-                    <textarea :name="`faqs[${index}][answer]`" x-model="faq.answer" rows="3"
-                              placeholder="Answer" maxlength="{{ $limits['faq_answer'] }}"
-                              class="admin-input"></textarea>
+
+                    {{-- Errors are keyed by the row index the editor sees --}}
+                    <div class="field" style="margin-bottom:10px;" :class="errFor(i, 'question') && 'has-error'">
+                        <input type="text" :name="`faqs[${i}][question]`" x-model="faq.question"
+                               class="input" placeholder="Question"
+                               maxlength="{{ $limits['faq_question'] }}">
+                        <div class="field__error" x-show="errFor(i, 'question')" x-cloak>
+                            <i class="fa-solid fa-circle-exclamation" style="margin-top:1px;"></i>
+                            <span x-text="errFor(i, 'question')"></span>
+                        </div>
+                    </div>
+
+                    <div class="field" style="margin-bottom:0;" :class="errFor(i, 'answer') && 'has-error'">
+                        <textarea :name="`faqs[${i}][answer]`" x-model="faq.answer" class="textarea" rows="3"
+                                  placeholder="Answer" maxlength="{{ $limits['faq_answer'] }}"></textarea>
+                        <div class="field__error" x-show="errFor(i, 'answer')" x-cloak>
+                            <i class="fa-solid fa-circle-exclamation" style="margin-top:1px;"></i>
+                            <span x-text="errFor(i, 'answer')"></span>
+                        </div>
+                    </div>
                 </div>
             </template>
-        </div>
 
-        <button type="button" @click="addFaq()"
-                class="mt-4 text-xs font-bold text-[#B4530A] hover:underline">
-            <i class="fa-solid fa-plus mr-1"></i> Add FAQ
+            <button type="button" class="btn btn--ghost btn--sm" @click="addFaq()">
+                <i class="fa-solid fa-plus" style="font-size:10px;"></i> Add FAQ
+            </button>
+
+            <hr style="border:none; border-top:1px solid var(--line); margin:18px 0;">
+
+            <x-admin.field name="faq_schema" label="FAQ JSON-LD override"
+                           hint="Fill this in only to <strong>replace</strong> the generated FAQ markup. When set, the generated block is not emitted — a page must never declare its FAQs twice. A <code>&lt;script&gt;</code> wrapper and multi-line answers are handled automatically.">
+                <textarea name="faq_schema" id="faq-schema" class="textarea textarea--mono" rows="5"
+                          placeholder='{"@@context":"https://schema.org","@@type":"FAQPage", ...}'>{{ $val('faq_schema') }}</textarea>
+            </x-admin.field>
+        </div>
+    </div>
+
+    {{-- ── Structured data ─────────────────────────────────── --}}
+    <div class="collapse" style="margin-top:14px;" x-data="{ open: {{ $errors->has('schema_markup') ? 'true' : 'false' }} }">
+        <button type="button" class="collapse__trigger" @click="open = !open" :aria-expanded="open">
+            <span>Structured data <span class="collapse__meta">— additional JSON-LD for this page</span></span>
+            <i class="collapse__chevron fa-solid fa-chevron-down"></i>
         </button>
 
-        <div class="mt-6 pt-5 border-t border-stone-100">
-            <label for="faq_schema" class="admin-label">FAQ JSON-LD (optional override)</label>
-            <textarea name="faq_schema" id="faq_schema" rows="5" class="admin-input font-mono text-xs"
-                      placeholder='{"@@context":"https://schema.org","@@type":"FAQPage",...}'>{{ $input('faq_schema') }}</textarea>
-            <p class="admin-hint">
-                Fill this in only to replace the generated FAQ markup. When set, the generated block is
-                <strong>not</strong> emitted — a page must never declare its FAQs twice.
-                A <code>&lt;script&gt;</code> wrapper and multi-line answers are handled automatically.
-            </p>
+        <div class="collapse__body" x-show="open" x-cloak>
+            <x-admin.field name="schema_markup" label="Additional JSON-LD"
+                           hint="Added to this page's <code>@@graph</code>. Do <strong>not</strong> include a <code>sameAs</code> list — the site-wide one already covers it, and two competing lists confuse Google.">
+                <textarea name="schema_markup" id="schema-markup" class="textarea textarea--mono" rows="10"
+                          placeholder="Paste from any schema generator — with or without the script wrapper.">{{ $val('schema_markup') }}</textarea>
+            </x-admin.field>
         </div>
-    </section>
+    </div>
 
-    {{-- ── Structured data (collapsible) ─────────────────────── --}}
-    <section class="bg-white border border-stone-200 rounded-2xl mb-5 overflow-hidden" x-data="{ open: false }">
-        <button type="button" @click="open = !open"
-                class="w-full flex items-center justify-between gap-4 px-6 py-4 text-left">
-            <span class="text-sm font-bold uppercase tracking-wider text-stone-500">Structured data</span>
-            <i class="fa-solid fa-chevron-down text-xs text-stone-400 transition-transform" :class="open && 'rotate-180'"></i>
-        </button>
-
-        <div x-show="open" x-cloak class="px-6 pb-6 border-t border-stone-100 pt-5">
-            <label for="schema_markup" class="admin-label">Additional JSON-LD</label>
-            <textarea name="schema_markup" id="schema_markup" rows="10" class="admin-input font-mono text-xs"
-                      placeholder='Paste from any schema generator — with or without the <script> wrapper.'>{{ $input('schema_markup') }}</textarea>
-            <p class="admin-hint">
-                Added to this page's <code>@@graph</code>. Do <strong>not</strong> include a
-                <code>sameAs</code> list here — the site-wide one already covers it, and two
-                competing lists confuse Google.
-            </p>
-        </div>
-    </section>
-
-    <div class="flex items-center justify-between gap-4">
+    {{-- ── Footer actions ──────────────────────────────────── --}}
+    <div class="row-between" style="margin-top:20px;">
         @if($seo->exists)
-            <button type="submit" form="delete-seo"
-                    class="text-xs font-bold text-rose-600 hover:text-rose-800"
+            <button type="submit" form="seo-delete" class="btn btn--danger-ghost btn--sm"
                     onclick="return confirm('Revert {{ $seo->page_key }} to its hardcoded defaults? The page keeps working.')">
                 Delete and use defaults
             </button>
@@ -243,41 +246,13 @@
             <span></span>
         @endif
 
-        <button type="submit" class="btn-yellow px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider">
-            Save
-        </button>
+        <button type="submit" class="btn btn--primary">Save</button>
     </div>
 </form>
 
 @if($seo->exists)
-    <form id="delete-seo" method="POST" action="{{ route('admin.seo.destroy', $seo) }}" class="hidden">
+    <form id="seo-delete" method="POST" action="{{ route('admin.seo.destroy', $seo) }}" style="display:none;">
         @csrf @method('DELETE')
     </form>
 @endif
-
-<script>
-    function seoForm(config) {
-        return {
-            faqs: config.faqs.length ? config.faqs : [{ question: '', answer: '' }],
-            title: @js($input('meta_title')),
-            description: @js($input('meta_description')),
-
-            addFaq() {
-                this.faqs.push({ question: '', answer: '' });
-            },
-
-            removeFaq(index) {
-                this.faqs.splice(index, 1);
-                if (!this.faqs.length) this.addFaq();
-            },
-
-            // Advisory only — the hard limit is enforced server-side.
-            counterClass(length, warn, max) {
-                if (length > max - 1) return 'text-rose-600 font-bold';
-                if (length > warn) return 'text-amber-600 font-bold';
-                return 'text-stone-400';
-            },
-        };
-    }
-</script>
 @endsection

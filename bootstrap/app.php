@@ -17,6 +17,12 @@ $app = Application::configure(basePath: $basePath)
         $middleware->alias([
             'admin' => \App\Http\Middleware\EnsureUserIsAdmin::class,
         ]);
+
+        // Never let a static-asset caching rule match an HTML route: a path
+        // pattern like /services/* also matches the /services *page*, and a
+        // long max-age there makes every content edit look broken for weeks.
+        // Scoping by file extension keeps HTML out of it entirely.
+        $middleware->append(\App\Http\Middleware\SetCacheHeaders::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
