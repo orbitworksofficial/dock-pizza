@@ -34,7 +34,22 @@ jobs:
           rm -rf ./build
           mv ./public/build ./build
 
-      - name: Deploy via FTP
+      # The build directory is uploaded on its own first, with a dedicated
+      # state file. Sharing the main state file meant the moved build/ was
+      # diffed against the previous public/build entries and skipped, so the
+      # deploy went green while shipping no assets at all.
+      - name: Deploy build assets
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./build/
+          server-dir: ./public_html/build/
+          state-name: .ftp-deploy-build-state.json
+          dangerous-clean-slate: true
+
+      - name: Deploy application
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
@@ -59,3 +74,5 @@ jobs:
             **/*.md
             **/phpunit.xml
             **/vite.config.js
+            # Handled by the dedicated build step above.
+            build/**
