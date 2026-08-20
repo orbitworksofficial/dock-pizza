@@ -26,9 +26,9 @@ jobs:
       - name: Build assets
         run: npm run build
 
-      # The document root is public_html, and bootstrap/app.php looks for the
-      # manifest at public_html/build/manifest.json. Vite writes to
-      # public/build, so move it up one level to match.
+      # Document root is public_html, and the live site loads assets from
+      # /build/assets/... — so the manifest must sit at public_html/build.
+      # Vite writes to public/build, so move it up one level.
       - name: Move build output to deploy location
         run: |
           rm -rf ./build
