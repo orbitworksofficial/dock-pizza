@@ -52,6 +52,11 @@ return [
             'title' => 'Catering & Event Pizza | Dock Pizza',
             'description' => 'Pizza catering for parties, offices and events around Shady Side and Anne Arundel County. Request a custom quote.',
         ],
+        '/blog' => [
+            'name' => 'Blog',
+            'title' => 'Blog — Pizza, Recipes & Local News | Dock Pizza',
+            'description' => 'Stories from the dock: pizza-making, local events around Shady Side, and what is coming out of our kitchen.',
+        ],
         '/login' => [
             'name' => 'Sign In',
             'title' => 'Sign In | Dock Pizza',

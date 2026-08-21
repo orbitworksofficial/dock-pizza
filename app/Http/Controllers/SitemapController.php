@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Models\BlogPost;
 use App\Models\Product;
 use App\Models\SeoMeta;
 use Illuminate\Http\Response;
@@ -53,7 +54,7 @@ class SitemapController extends Controller
         $noindex = $this->noindexKeys();
         $urls = [];
 
-        foreach (['/' => '1.0', '/menu' => '0.9', '/catering' => '0.8'] as $path => $priority) {
+        foreach (['/' => '1.0', '/menu' => '0.9', '/catering' => '0.8', '/blog' => '0.8'] as $path => $priority) {
             if (in_array($path, $noindex, true)) {
                 continue;
             }
@@ -81,8 +82,23 @@ class SitemapController extends Controller
                 }
             });
 
-        // Blog posts are intentionally absent: the tables exist but there are
-        // no routes or models yet. Add the query here when the blog ships.
+        // Published posts, excluding any marked noindex.
+        BlogPost::published()
+            ->where(function ($q) {
+                $q->whereNull('robots')->orWhere('robots', 'not like', '%noindex%');
+            })
+            ->select(['slug', 'updated_at'])
+            ->orderByDesc('published_at')
+            ->chunk(200, function ($posts) use (&$urls) {
+                foreach ($posts as $post) {
+                    $urls[] = [
+                        'loc' => url('/blog/' . $post->slug),
+                        'lastmod' => $post->updated_at?->toAtomString(),
+                        'changefreq' => 'monthly',
+                        'priority' => '0.6',
+                    ];
+                }
+            });
 
         return $urls;
     }

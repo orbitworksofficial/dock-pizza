@@ -11,6 +11,7 @@ class Faq extends Model
 {
     protected $fillable = [
         'seo_meta_id',
+        'blog_post_id',
         'question',
         'answer',
         'category',

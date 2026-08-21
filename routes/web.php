@@ -54,6 +54,10 @@ Route::middleware('auth')->group(function () {
 Route::get('/catering', [CateringController::class, 'index'])->name('catering.index');
 Route::post('/catering', [CateringController::class, 'submit'])->name('catering.submit');
 
+// Blog (public)
+Route::get('/blog', [\App\Http\Controllers\BlogController::class, 'index'])->name('blog.index');
+Route::get('/blog/{slug}', [\App\Http\Controllers\BlogController::class, 'show'])->name('blog.show');
+
 // Generated from routes + content, never hand-edited files
 Route::get('/sitemap.xml', [\App\Http\Controllers\SitemapController::class, 'sitemap'])->name('sitemap');
 Route::get('/robots.txt', [\App\Http\Controllers\SitemapController::class, 'robots'])->name('robots');
@@ -75,6 +79,26 @@ Route::middleware(['auth', 'admin:author'])->prefix('admin')->name('admin.')->gr
     Route::post('/uploads/image', [\App\Http\Controllers\Admin\ImageUploadController::class, 'store'])->name('uploads.image');
 
     Route::post('/logout', [\App\Http\Controllers\Admin\AuthController::class, 'logout'])->name('logout');
+
+    // Posts — authors reach these, but PostController re-checks ownership
+    // on every record before acting on it.
+    Route::get('/posts', [\App\Http\Controllers\Admin\PostController::class, 'index'])->name('posts.index');
+    Route::get('/posts/create', [\App\Http\Controllers\Admin\PostController::class, 'create'])->name('posts.create');
+    Route::post('/posts', [\App\Http\Controllers\Admin\PostController::class, 'store'])->name('posts.store');
+    Route::get('/posts/{post}/edit', [\App\Http\Controllers\Admin\PostController::class, 'edit'])->name('posts.edit');
+    Route::put('/posts/{post}', [\App\Http\Controllers\Admin\PostController::class, 'update'])->name('posts.update');
+    Route::delete('/posts/{post}', [\App\Http\Controllers\Admin\PostController::class, 'destroy'])->name('posts.destroy');
+
+    // Taxonomy
+    Route::get('/categories', [\App\Http\Controllers\Admin\TaxonomyController::class, 'categories'])->name('categories.index');
+    Route::post('/categories', [\App\Http\Controllers\Admin\TaxonomyController::class, 'storeCategory'])->name('categories.store');
+    Route::put('/categories/{category}', [\App\Http\Controllers\Admin\TaxonomyController::class, 'updateCategory'])->name('categories.update');
+    Route::delete('/categories/{category}', [\App\Http\Controllers\Admin\TaxonomyController::class, 'destroyCategory'])->name('categories.destroy');
+
+    Route::get('/tags', [\App\Http\Controllers\Admin\TaxonomyController::class, 'tags'])->name('tags.index');
+    Route::post('/tags', [\App\Http\Controllers\Admin\TaxonomyController::class, 'storeTag'])->name('tags.store');
+    Route::put('/tags/{tag}', [\App\Http\Controllers\Admin\TaxonomyController::class, 'updateTag'])->name('tags.update');
+    Route::delete('/tags/{tag}', [\App\Http\Controllers\Admin\TaxonomyController::class, 'destroyTag'])->name('tags.destroy');
 });
 
 // Admin-only: site-wide settings authors must not change.

@@ -91,8 +91,9 @@ window.charCounter = function (initial = '', warn = 60, max = 70) {
     };
 };
 
-window.Alpine = Alpine;
-Alpine.start();
+// Alpine is started at the end of this file, after every x-data factory
+// (richText, postEditor, …) has been assigned to window — otherwise Alpine
+// initialises components whose factory does not exist yet.
 
 // ═══════════════════════════════════════════════════════════════
 // jQuery Setup
@@ -586,3 +587,239 @@ $(document).ready(function () {
     window.__bindDockPlaces();
     window.__bindStreetAutocomplete();
 });
+
+// ═══════════════════════════════════════════════════════════════
+// Rich text editor (admin)
+// contenteditable based, so there is no bundled editor dependency.
+// Emits plain semantic HTML.
+// ═══════════════════════════════════════════════════════════════
+
+window.richText = function (initialHtml) {
+    return {
+        html: initialHtml || '',
+        outline: [],
+        words: 0,
+        minutes: 1,
+
+        init() {
+            this.$refs.editor.innerHTML = this.html || '<p></p>';
+            this.sync();
+
+            // Paste as plain text: pasted Word/Docs markup otherwise carries
+            // inline styles and spans that wreck the article styling.
+            this.$refs.editor.addEventListener('paste', (e) => {
+                e.preventDefault();
+                const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+                document.execCommand('insertText', false, text);
+            });
+        },
+
+        cmd(command, value = null) {
+            this.$refs.editor.focus();
+            document.execCommand(command, false, value);
+            this.sync();
+        },
+
+        block(tag) {
+            this.$refs.editor.focus();
+            document.execCommand('formatBlock', false, tag);
+            this.sync();
+        },
+
+        codeBlock() {
+            this.$refs.editor.focus();
+            const sel = window.getSelection();
+            const text = sel && sel.toString() ? sel.toString() : 'code';
+            document.execCommand('insertHTML', false,
+                '<pre><code>' + text.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])) + '</code></pre><p></p>');
+            this.sync();
+        },
+
+        addLink() {
+            const url = prompt('Link URL');
+            if (!url) return;
+            // Reject javascript: and data: URLs — they execute in the reader's
+            // browser when the published article is viewed.
+            if (!/^(https?:\/\/|\/|mailto:|tel:)/i.test(url)) {
+                alert('Enter an http(s), mailto:, tel: or root-relative URL.');
+                return;
+            }
+            this.cmd('createLink', url);
+        },
+
+        addImage() {
+            const url = prompt('Image URL');
+            if (!url) return;
+            if (!/^(https?:\/\/|\/)/i.test(url)) {
+                alert('Enter an http(s) or root-relative image URL.');
+                return;
+            }
+            this.cmd('insertImage', url);
+        },
+
+        jumpTo(id) {
+            const el = this.$refs.editor.querySelector('#' + CSS.escape(id));
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        },
+
+        sync() {
+            const el = this.$refs.editor;
+            this.html = el.innerHTML;
+
+            const text = (el.innerText || '').trim();
+            this.words = text ? text.split(/\s+/).length : 0;
+            this.minutes = Math.max(1, Math.ceil(this.words / 200));
+
+            // Rebuild the outline. Headings get a stable id so the outline can
+            // scroll to them.
+            const out = [];
+            el.querySelectorAll('h2, h3, h4').forEach((h, i) => {
+                if (!h.id) h.id = 'h-' + i + '-' + Math.random().toString(36).slice(2, 7);
+                const t = (h.textContent || '').trim();
+                if (t) out.push({ id: h.id, text: t, level: h.tagName.toLowerCase() });
+            });
+            this.outline = out;
+
+            this.$dispatch('editor-changed', { html: this.html });
+        },
+    };
+};
+
+// ═══════════════════════════════════════════════════════════════
+// Post editor (admin)
+// ═══════════════════════════════════════════════════════════════
+
+window.postEditor = function (config) {
+    return {
+        title: config.title || '',
+        slug: config.slug || '',
+        // Once a post is published or its slug hand-edited, the URL is public.
+        // Changing it silently breaks inbound links and loses rankings, so the
+        // slug stops following the title from that point on.
+        slugLocked: !!config.slugLocked,
+        draftKey: 'dock_post_draft:' + (config.postId || 'new'),
+        draftFound: false,
+        draftAt: null,
+        saving: false,
+        dirty: false,
+
+        init() {
+            this.checkDraft();
+
+            // Autosave anything typed, so an accidental reload or crash does
+            // not lose a long post.
+            this.$watch('title', () => this.queueSave());
+            this.$el.addEventListener('input', () => this.queueSave());
+            this.$el.addEventListener('editor-changed', () => this.queueSave());
+
+            // A real submit means the draft has served its purpose.
+            this.$el.addEventListener('submit', () => this.clearDraft());
+        },
+
+        onTitleInput() {
+            if (!this.slugLocked) {
+                this.slug = this.slugify(this.title);
+            }
+        },
+
+        onSlugInput() {
+            // A hand-edited slug is deliberate: stop tracking the title.
+            this.slugLocked = true;
+        },
+
+        slugify(v) {
+            return String(v).toLowerCase().trim()
+                .replace(/[^a-z0-9\s-]/g, '')
+                .replace(/\s+/g, '-')
+                .replace(/-+/g, '-')
+                .replace(/^-|-$/g, '');
+        },
+
+        queueSave() {
+            this.dirty = true;
+            clearTimeout(this._t);
+            this._t = setTimeout(() => this.saveDraft(), 800);
+        },
+
+        collect() {
+            const data = {};
+            this.$el.querySelectorAll('[name]').forEach((f) => {
+                if (!f.name || f.type === 'hidden' && f.name === '_token') return;
+                if (f.name === '_token' || f.name === '_method') return;
+                if (f.type === 'checkbox') data[f.name] = f.checked;
+                else if (f.type === 'radio') { if (f.checked) data[f.name] = f.value; }
+                else data[f.name] = f.value;
+            });
+            return data;
+        },
+
+        saveDraft() {
+            try {
+                localStorage.setItem(this.draftKey, JSON.stringify({
+                    savedAt: Date.now(),
+                    fields: this.collect(),
+                }));
+                this.dirty = false;
+            } catch (e) {
+                // Storage full or unavailable — autosave is best effort.
+            }
+        },
+
+        checkDraft() {
+            try {
+                const raw = localStorage.getItem(this.draftKey);
+                if (!raw) return;
+                const p = JSON.parse(raw);
+                if (!p || !p.fields || !p.savedAt) return;
+                // A week is long enough to recover from a crash, short enough
+                // that a stale draft does not resurface months later.
+                if (Date.now() - p.savedAt > 7 * 24 * 60 * 60 * 1000) {
+                    this.clearDraft();
+                    return;
+                }
+                this._draft = p;
+                this.draftAt = new Date(p.savedAt).toLocaleString();
+                this.draftFound = true;
+            } catch (e) { /* ignore */ }
+        },
+
+        restoreDraft() {
+            const p = this._draft;
+            if (!p) return;
+
+            Object.entries(p.fields).forEach(([name, value]) => {
+                const f = this.$el.querySelector(`[name="${CSS.escape(name)}"]`);
+                if (!f) return;
+                if (f.type === 'checkbox') f.checked = !!value;
+                else f.value = value;
+                f.dispatchEvent(new Event('input', { bubbles: true }));
+                f.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+
+            if (p.fields.title) this.title = p.fields.title;
+            if (p.fields.slug) { this.slug = p.fields.slug; this.slugLocked = true; }
+
+            // The editor surface is contenteditable, not an input, so its
+            // value has to be pushed back in by hand.
+            if (p.fields.content) {
+                const surface = this.$el.querySelector('.rte__surface');
+                if (surface) {
+                    surface.innerHTML = p.fields.content;
+                    surface.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+            }
+
+            this.draftFound = false;
+            if (window.toast) window.toast('Draft restored.', 'ok');
+        },
+
+        clearDraft() {
+            try { localStorage.removeItem(this.draftKey); } catch (e) { /* ignore */ }
+            this.draftFound = false;
+        },
+    };
+};
+
+// Every factory is now on window — safe to start Alpine.
+window.Alpine = Alpine;
+Alpine.start();

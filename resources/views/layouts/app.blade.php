@@ -66,6 +66,8 @@
                     class="text-sm font-bold text-stone-600 hover:text-[#E07B2D] transition-colors uppercase tracking-wider">Menu</a>
                 <a href="{{ route('catering.index') }}"
                     class="text-sm font-bold text-stone-600 hover:text-[#E07B2D] transition-colors uppercase tracking-wider">Catering</a>
+                <a href="{{ route('blog.index') }}"
+                    class="text-sm font-bold text-stone-600 hover:text-[#E07B2D] transition-colors uppercase tracking-wider">Blog</a>
             </nav>
 
             <!-- Center: Search Input & Location Selection -->
@@ -195,6 +197,12 @@
                             class="flex items-center space-x-3 text-stone-700 hover:text-black font-semibold py-2">
                             <i class="fa-solid fa-utensils text-stone-400 w-5"></i>
                             <span>Catering</span>
+                        </a>
+                        <a href="{{ route('blog.index') }}"
+                            @click.prevent="mobileMenuOpen = false; setTimeout(() => window.location.href = '{{ route('blog.index') }}', 150)"
+                            class="flex items-center space-x-3 text-stone-700 hover:text-black font-semibold py-2">
+                            <i class="fa-solid fa-newspaper text-stone-400 w-5"></i>
+                            <span>Blog</span>
                         </a>
                         @auth
                             <a href="{{ route('orders.history') }}"
